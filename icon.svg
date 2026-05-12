@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Coffee Chat Linkflow">
+  <rect width="256" height="256" rx="56" fill="#184d3b"/>
+  <path d="M68 98c0-16 13-29 29-29h64c16 0 29 13 29 29v24c0 16-13 29-29 29h-6l-20 18c-4 4-11 1-11-5v-13H97c-16 0-29-13-29-29V98z" fill="#fff"/>
+  <path d="M88 92h80v14H88zM88 118h56v14H88z" fill="#184d3b"/>
+  <circle cx="92" cy="98" r="6" fill="#184d3b"/>
+  <circle cx="118" cy="98" r="6" fill="#184d3b"/>
+  <circle cx="144" cy="98" r="6" fill="#184d3b"/>
+</svg>
