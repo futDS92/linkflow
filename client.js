@@ -28,6 +28,8 @@ const state = {
   rangeEnd: '',
   slotStatus: {},
   guest: { role: '', interest: '', intent: '' },
+  shareId: '',
+  sharePromise: null,
 };
 
 const bookingStoreKey = 'linkflow.bookings.v1';
@@ -237,11 +239,18 @@ function buildPayload() {
   };
 }
 
-function getShareUrl() {
-  const encoded = base64UrlEncode(JSON.stringify(buildPayload()));
-  const url = new URL(window.location.href);
-  url.searchParams.set('share', encoded);
-  return url.toString();
+async function createShareRecord() {
+  const response = await fetch('/api/shares', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payload: buildPayload() }),
+  });
+  if (!response.ok) {
+    throw new Error('share creation failed');
+  }
+  const data = await response.json();
+  state.shareId = data.id;
+  return data.id;
 }
 
 function applyPayload(payload) {
@@ -261,11 +270,18 @@ function applyPayload(payload) {
   }
 }
 
-function loadFromShare() {
+async function loadFromShare() {
   const share = new URL(window.location.href).searchParams.get('share');
   if (!share) return;
   state.mode = 'guest';
   try {
+    const response = await fetch(`/api/shares?id=${encodeURIComponent(share)}`, { cache: 'no-store' });
+    if (response.ok) {
+      const data = await response.json();
+      applyPayload(data.payload || {});
+      state.shareId = share;
+      return;
+    }
     applyPayload(JSON.parse(base64UrlDecode(share)));
   } catch (error) {
     console.error('Failed to parse share payload', error);
@@ -352,7 +368,28 @@ function renderStatus() {
 }
 
 function renderShareLink() {
-  el.shareLink.value = getShareUrl();
+  const url = new URL(window.location.href);
+  if (!state.shareId) {
+    el.shareLink.value = '링크 생성 중...';
+    if (!state.sharePromise) {
+      state.sharePromise = createShareRecord()
+        .then((id) => {
+          url.searchParams.set('share', id);
+          el.shareLink.value = url.toString();
+          return id;
+        })
+        .catch(() => {
+          el.shareLink.value = '링크를 만들 수 없습니다.';
+          return '';
+        })
+        .finally(() => {
+          state.sharePromise = null;
+        });
+    }
+    return;
+  }
+  url.searchParams.set('share', state.shareId);
+  el.shareLink.value = url.toString();
 }
 
 function renderSlotGrid() {
@@ -573,10 +610,13 @@ function loadDemo() {
   renderAll();
 }
 
-function copyLink() {
-  navigator.clipboard.writeText(getShareUrl()).then(() => {
-    el.bookingResult.textContent = '공유 링크를 복사했습니다.';
-  });
+async function copyLink() {
+  if (!state.shareId && state.sharePromise) {
+    await state.sharePromise;
+    renderShareLink();
+  }
+  await navigator.clipboard.writeText(el.shareLink.value);
+  el.bookingResult.textContent = '공유 링크를 복사했습니다.';
 }
 
 function setTab(tab) {
@@ -627,8 +667,8 @@ function bindEvents() {
   });
 }
 
-function hydrate() {
-  loadFromShare();
+async function hydrate() {
+  await loadFromShare();
   state.recommendedSlots = collectAvailableSlots();
   document.body.dataset.mode = state.mode;
   el.rangeStart.value = state.rangeStart;
@@ -647,15 +687,16 @@ function main() {
   setRangeDefaults();
   seedSlots();
   bindEvents();
-  hydrate();
-  syncAuthStatus();
-  renderAll();
-  loadBookingHistory();
+  hydrate().then(() => {
+    syncAuthStatus();
+    renderAll();
+    loadBookingHistory();
+    if (state.mode === 'guest') {
+      setTab('guest');
+    }
+  });
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
-  if (state.mode === 'guest') {
-    setTab('guest');
   }
 }
 

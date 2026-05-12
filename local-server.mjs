@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const root = __dirname;
 const dataDir = path.join(root, 'data');
 const bookingsFile = path.join(dataDir, 'bookings.json');
+const sharesFile = path.join(dataDir, 'shares.json');
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -17,12 +18,24 @@ if (!fs.existsSync(bookingsFile)) {
   fs.writeFileSync(bookingsFile, JSON.stringify({ bookings: [] }, null, 2));
 }
 
+if (!fs.existsSync(sharesFile)) {
+  fs.writeFileSync(sharesFile, JSON.stringify({ shares: {} }, null, 2));
+}
+
 function readBookings() {
   return JSON.parse(fs.readFileSync(bookingsFile, 'utf8'));
 }
 
 function writeBookings(payload) {
   fs.writeFileSync(bookingsFile, JSON.stringify(payload, null, 2));
+}
+
+function readShares() {
+  return JSON.parse(fs.readFileSync(sharesFile, 'utf8'));
+}
+
+function writeShares(payload) {
+  fs.writeFileSync(sharesFile, JSON.stringify(payload, null, 2));
 }
 
 function sendJson(res, status, payload) {
@@ -105,6 +118,18 @@ function createBooking(payload) {
   return booking;
 }
 
+function createShare(payload) {
+  const store = readShares();
+  const id = crypto.randomUUID();
+  store.shares[id] = {
+    id,
+    createdAt: new Date().toISOString(),
+    payload,
+  };
+  writeShares(store);
+  return { id };
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
 
@@ -147,6 +172,32 @@ const server = http.createServer(async (req, res) => {
       });
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid preview payload' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/shares' && req.method === 'GET') {
+    const id = url.searchParams.get('id');
+    if (!id) {
+      sendJson(res, 400, { error: 'Missing id' });
+      return;
+    }
+    const store = readShares();
+    const share = store.shares[id];
+    if (!share) {
+      sendJson(res, 404, { error: 'Not found' });
+      return;
+    }
+    sendJson(res, 200, share);
+    return;
+  }
+
+  if (url.pathname === '/api/shares' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      sendJson(res, 201, createShare(body.payload || body));
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid share payload' });
     }
     return;
   }
