@@ -3,7 +3,7 @@ self.addEventListener('install', (event) => {
     '/',
     '/index.html',
     '/styles.css',
-    '/app.js',
+    '/client.js',
     '/manifest.webmanifest',
     '/icon.svg',
   ])));
